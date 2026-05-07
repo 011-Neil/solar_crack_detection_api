@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIT Dynamics - AI Vision Inspection</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: url('https://images.unsplash.com/photo-1629904039833-ffc625841e21?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+        
+        #simulation-container {
+            background: linear-gradient(180deg, #4a5568, #2d3748); /* Dark slate gradient */
+            border: 2px solid #718096;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1);
+        }
+
+        .conveyor-belt {
+            background-color: #2d3748;
+            background-image: linear-gradient(rgba(255,255,255,0.05) 50%, transparent 50%);
+            background-size: 100% 40px;
+            border-left: 5px solid #4a5568;
+            border-right: 5px solid #4a5568;
+        }
+        
+        .conveyor-platform {
+            background: linear-gradient(180deg, #4a5568, #3a4556);
+            border-top: 2px solid #718096;
+            border-bottom: 2px solid #2d3748;
+            box-shadow: inset 0 6px 12px rgba(0,0,0,0.5), 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .solar-panel {
+            background-color: #050A30; /* Dark blue for cells */
+            border: 4px solid #a0aec0; /* Lighter grey frame */
+            transition: transform 1.5s ease-in-out;
+            background-image: 
+                linear-gradient(rgba(200, 200, 200, 0.2) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(200, 200, 200, 0.2) 1px, transparent 1px);
+            background-size: 20px 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #el-panel-image {
+             background-color: #080d2b;
+             box-shadow: inset 0 0 50px #3182ce;
+        }
+        .station {
+            border: 2px dashed #a0aec0;
+            transition: all 0.3s ease-in-out;
+            background-color: rgba(107, 114, 128, 0.7);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        .station.active {
+            background-color: rgba(99, 179, 237, 0.2);
+            box-shadow: 0 0 25px 8px #63b3ed, inset 0 0 10px rgba(0,0,0,0.5);
+            border-color: #63b3ed;
+        }
+        .camera-flash {
+            animation: flash 0.3s ease-out;
+        }
+        @keyframes flash {
+            0% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 0.8; }
+            100% { opacity: 0; transform: scale(1.2); }
+        }
+        .camera-icon {
+            width: 48px;
+            height: 48px;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+        }
+        .scanner-bar {
+            position: absolute;
+            top: 0;
+            left: -10%;
+            width: 10%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            box-shadow: 0 0 10px white;
+            border-radius: 4px;
+            animation: scan 1s linear infinite;
+        }
+        @keyframes scan {
+            0% { left: -10%; }
+            100% { left: 100%; }
+        }
+        .defect-box {
+            position: absolute;
+            background-color: rgba(255, 235, 59, 0.2);
+            border: 2px solid #FBBF24;
+            box-shadow: 0 0 15px #FBBF24;
+            animation: fadeInBox 0.5s ease-out forwards;
+            opacity: 0; /* Start hidden */
+        }
+        @keyframes fadeInBox {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .defect-box::after {
+            content: attr(data-type) ' (' attr(data-severity) ')';
+            position: absolute;
+            bottom: 100%;
+            left: -2px;
+            background-color: #FBBF24;
+            color: #422006;
+            padding: 3px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px 4px 0 0;
+            white-space: nowrap;
+        }
+        
+        /* AI Processing Animation */
+        .ai-processing-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(8, 13, 43, 0.7);
+            border-radius: 0.25rem;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            pointer-events: none;
+        }
+        .ai-processing-overlay.active {
+            opacity: 1;
+        }
+        
+        /* Model Workflow Visualization */
+        .workflow-step {
+            transition: all 0.3s ease-in-out;
+            background-color: #4A5568; /* Default color */
+            border-color: #718096;
+        }
+        .workflow-step.active {
+            background-color: #3B82F6; /* Active blue */
+            border-color: #93C5FD;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #3B82F6;
+        }
+        .workflow-arrow {
+            color: #718096;
+            transition: all 0.3s ease-in-out;
+        }
+        .workflow-step.active + .workflow-arrow {
+            color: #93C5FD;
+        }
+
+        /* Visual Defects on Panel */
+        .visual-defect {
+            position: absolute;
+            border-radius: 4px;
+            animation: fadeInDefect 0.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeInDefect {
+            to { opacity: 1; }
+        }
+
+        .visual-crack {
+            background: #93c5fd; /* A light blue glow */
+            box-shadow: 0 0 6px 1px #93c5fd, 0 0 3px 1px #fff;
+        }
+
+        .visual-micro-crack {
+            background: rgba(147, 197, 253, 0.5); /* Very faint blue */
+            box-shadow: 0 0 2px 0px rgba(147, 197, 253, 0.5); /* Minimal shadow */
+        }
+
+        .visual-dark-spot {
+            background: rgba(45, 55, 72, 0.6); /* a darker, less-lit area */
+            border: 1px solid rgba(100, 116, 139, 0.5);
+        }
+
+    </style>
+</head>
+<body>
+<div id="main-wrapper" class="relative w-screen h-screen flex items-center justify-center p-4">
+    <div id="simulation-container" class="w-full max-w-7xl h-full max-h-[95vh] rounded-xl shadow-2xl p-6 flex flex-col">
+
+        <!-- Header -->
+        <header class="text-center pb-4 border-b border-gray-600">
+            <h1 class="text-3xl font-extrabold text-gray-100">
+                <span class="text-blue-400">NIT</span> Dynamics
+            </h1>
+            <p class="text-md text-gray-400 mt-1">Powering the Future of Manufacturing with AI-Driven Quality Assurance</p>
+        </header>
+
+        <!-- Dynamic Content Area -->
+        <main class="flex-grow relative mt-4">
+
+            <!-- 1. Start Screen -->
+            <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center rounded-lg">
+                <h2 class="text-4xl font-bold text-gray-100 mb-3">Next-Generation AI Vision Inspection</h2>
+                <p class="text-gray-300 mb-8 max-w-2xl text-center text-lg">
+                    Experience our industry-leading AI platform. This demo highlights our system's core advantages:
+                    <span class="font-bold text-blue-300">faster testing cycles</span>, 
+                    <span class="font-bold text-blue-300">more effective defect detection</span>, 
+                    and a transparent <span class="font-bold text-blue-300">live AI model workflow</span>.
+                </p>
+                <button id="start-btn" class="bg-blue-600 text-white font-bold py-3 px-10 rounded-lg shadow-lg hover:bg-blue-700 transition-all transform hover:scale-105">
+                    Launch Demonstration
+                </button>
+            </div>
+
+            <!-- 2. Inspection Line -->
+            <div id="inspection-line" class="absolute inset-0 hidden">
+                <div class="w-full h-full flex flex-col justify-center">
+                    <div id="status-display" class="w-1/2 mx-auto text-center bg-gray-200 p-3 rounded-lg mb-8 shadow-inner relative overflow-hidden transition-all duration-500">
+                        <p class="font-semibold text-gray-800 text-lg">Initializing...</p>
+                        <div id="scanner-bar" class="scanner-bar hidden"></div>
+                    </div>
+                    <div class="conveyor-platform relative w-full h-48 rounded-lg p-4">
+                        <div class="conveyor-belt w-full h-full rounded-lg flex items-center justify-between px-16">
+                            <div id="el-station" class="station w-48 h-40 flex flex-col items-center justify-center rounded-lg">
+                                <span class="text-white font-bold text-lg">EL Test Station</span>
+                            </div>
+                            <div id="camera-station" class="station w-48 h-40 flex flex-col items-center justify-center rounded-lg">
+                                 <svg class="camera-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h3l2-2h6l2 2h3v16H4V4zm8 14c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0-8c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3z"/></svg>
+                                  <span class="text-white font-bold text-lg">Image Acquisition</span>
+                                  <div id="flash-overlay" class="absolute w-48 h-40 bg-white opacity-0 rounded-lg pointer-events-none"></div>
+                            </div>
+                        </div>
+                        <div id="solar-panel" class="solar-panel absolute w-40 h-24 top-1/2 -mt-12 left-[-180px]" style="transform: translateX(0px);"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 3. Analysis Screen -->
+            <div id="analysis-screen" class="absolute inset-0 hidden flex-col">
+                 <div class="w-full h-full bg-gray-200 rounded-lg border border-gray-300 shadow-inner p-6 flex flex-col">
+                    <div class="flex-shrink-0">
+                        <h2 class="text-3xl font-bold text-gray-800 text-center">Live AI Analysis</h2>
+                        <p class="text-center text-gray-500">Processing Panel ID: <span id="analysis-panel-id" class="font-semibold text-gray-700"></span></p>
+                    </div>
+                    <div class="flex-grow flex h-full space-x-6 mt-4 overflow-hidden">
+                        <!-- Left: Image & Workflow -->
+                        <div class="w-2/3 h-full flex flex-col space-y-4">
+                             <div class="w-full flex-grow bg-slate-900 rounded-lg shadow-lg p-4 flex flex-col">
+                                <h3 class="text-lg font-semibold text-slate-300 text-center flex-shrink-0 mb-2">Electroluminescence Feed</h3>
+                                <div id="el-panel-image-container" class="w-full flex-grow relative flex items-center justify-center p-2">
+                                    <div id="el-panel-image" class="w-full max-w-full h-full max-h-full aspect-[1.6/1] solar-panel border-8 border-gray-600 relative overflow-hidden">
+                                        <!-- AI Processing Overlay -->
+                                        <div id="ai-processing-overlay" class="ai-processing-overlay flex items-center justify-center p-4">
+                                            <p class="text-2xl font-bold text-white text-center animate-pulse">NIT Dynamics AI is Analyzing...</p>
+                                        </div>
+                                        <!-- Defect boxes will be injected here -->
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Model Workflow -->
+                             <div id="model-workflow" class="flex-shrink-0 bg-slate-900 rounded-lg shadow-lg p-3">
+                                <h3 class="text-md font-semibold text-slate-300 text-center mb-3">Real-Time AI Model Workflow</h3>
+                                <div class="flex items-center justify-center space-x-2 text-white">
+                                    <div id="wf-step-1" class="workflow-step text-center rounded-lg p-2 border-2 text-sm">Image Acquired</div>
+                                    <div class="workflow-arrow font-bold text-xl">&rarr;</div>
+                                    <div id="wf-step-2" class="workflow-step text-center rounded-lg p-2 border-2 text-sm">AI Pre-processing</div>
+                                    <div class="workflow-arrow font-bold text-xl">&rarr;</div>
+                                    <div id="wf-step-3" class="workflow-step text-center rounded-lg p-2 border-2 text-sm">Defect Detection</div>
+                                    <div class="workflow-arrow font-bold text-xl">&rarr;</div>
+                                    <div id="wf-step-4" class="workflow-step text-center rounded-lg p-2 border-2 text-sm">Classification</div>
+                                    <div class="workflow-arrow font-bold text-xl">&rarr;</div>
+                                    <div id="wf-step-5" class="workflow-step text-center rounded-lg p-2 border-2 text-sm">Result Output</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Right: Report -->
+                        <div class="w-1/3 h-full bg-white rounded-lg shadow p-6 flex flex-col">
+                            <h3 class="text-2xl font-bold text-gray-800 border-b pb-3 mb-4 flex-shrink-0">Automated Inspection Report</h3>
+                            <div id="defect-summary" class="my-2 text-center p-4 rounded-lg font-bold text-xl flex-shrink-0"></div>
+                            <div class="flex-grow overflow-y-auto">
+                                <ul id="defect-list" class="space-y-3 pt-2">
+                                    <!-- Defect list items will be injected here -->
+                                </ul>
+                            </div>
+                             <!-- Performance Metrics -->
+                            <div class="flex-shrink-0 pt-4 mt-4 border-t">
+                                <h4 class="text-lg font-bold text-gray-700 mb-2">Performance Metrics</h4>
+                                <div class="text-sm space-y-1 text-gray-600">
+                                    <p><strong>Analysis Time:</strong> <span class="font-mono text-green-600 font-semibold">0.18 seconds</span></p>
+                                    <p><strong>Model Accuracy:</strong> <span class="font-mono text-green-600 font-semibold">99.8%</span></p>
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0 mt-4 pt-4 border-t flex space-x-2">
+                                <button id="restart-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-blue-700 transition-all">Restart Demo</button>
+                                <button id="home-btn" class="w-full bg-gray-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-gray-600 transition-all">Back to Home</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const screens = {
+                start: document.getElementById('start-screen'),
+                inspection: document.getElementById('inspection-line'),
+                analysis: document.getElementById('analysis-screen'),
+            };
+            const buttons = {
+                start: document.getElementById('start-btn'),
+                restart: document.getElementById('restart-btn'),
+                home: document.getElementById('home-btn'),
+            };
+            const elements = {
+                panel: document.getElementById('solar-panel'),
+                statusText: document.getElementById('status-display').querySelector('p'),
+                scannerBar: document.getElementById('scanner-bar'),
+                elStation: document.getElementById('el-station'),
+                cameraStation: document.getElementById('camera-station'),
+                flash: document.getElementById('flash-overlay'),
+                analysisPanelId: document.getElementById('analysis-panel-id'),
+                elPanelImage: document.getElementById('el-panel-image'),
+                defectSummary: document.getElementById('defect-summary'),
+                defectList: document.getElementById('defect-list'),
+                aiProcessingOverlay: document.getElementById('ai-processing-overlay'),
+                workflowSteps: document.querySelectorAll('.workflow-step'),
+            };
+
+            const PRESET_DEFECTS = [
+                { 
+                    type: 'Microcrack', severity: 'Critical',
+                    // Tighter bounding box for a very small defect
+                    top: '18%', left: '22%', width: '8%', height: '8%',
+                    // Very small, faint visual crack
+                    visual: { top: '22%', left: '23%', width: '6%', height: '1px', transform: 'rotate(-15deg)', class: 'visual-micro-crack' }
+                },
+                { 
+                    type: 'Cell Crack', severity: 'Critical',
+                    // Bounding box tightly wrapping the visual defect
+                    top: '48%', left: '50%', width: '22%', height: '22%',
+                    // Visual defect properties
+                    visual: { top: '58%', left: '51%', width: '20%', height: '2px', transform: 'rotate(-45deg)', class: 'visual-crack' }
+                },
+                { 
+                    type: 'Finger Interruption', severity: 'Minor',
+                    // Bounding box and visual are the same for this non-rotated defect
+                    top: '70%', left: '10%', width: '40%', height: '8%',
+                    visual: { top: '70%', left: '10%', width: '40%', height: '8%', transform: 'none', class: 'visual-dark-spot' }
+                }
+            ];
+            
+            const SEVERITY_STYLES = {
+                'Critical': { borderColor: '#EF4444', bgColor: 'bg-red-50' },
+                'Minor': { borderColor: '#FBBF24', bgColor: 'bg-amber-50' },
+            };
+            
+            let panelIdCounter = 0;
+            let currentPanel = {};
+            let isPaused = true;
+            let timeoutIds = [];
+            
+            const switchScreen = (screenName) => {
+                Object.values(screens).forEach(s => s.classList.add('hidden'));
+                if(screens[screenName]) {
+                    screens[screenName].classList.remove('hidden', 'flex', 'flex-col');
+                    if(screenName === 'analysis' || screenName === 'start') {
+                         screens[screenName].classList.add('flex', 'flex-col');
+                    } else {
+                        screens[screenName].classList.add('flex');
+                    }
+                }
+            };
+            
+            const updateStatus = (text) => {
+                elements.statusText.textContent = text;
+            };
+
+            const runTimeout = (callback, delay) => {
+                if(isPaused) return;
+                const id = setTimeout(callback, delay);
+                timeoutIds.push(id);
+            };
+
+            const clearAllTimeouts = () => {
+                timeoutIds.forEach(clearTimeout);
+                timeoutIds = [];
+            };
+
+            const resetState = () => {
+                clearAllTimeouts();
+                isPaused = true;
+                panelIdCounter = 0;
+                elements.panel.style.transition = 'none';
+                elements.panel.style.transform = 'translateX(0px)';
+                elements.elPanelImage.querySelectorAll('.defect-box, .visual-defect').forEach(el => el.remove());
+                switchScreen('start');
+            };
+
+            const runInspectionFlow = () => {
+                if (isPaused) return;
+                clearAllTimeouts();
+                switchScreen('inspection');
+                panelIdCounter++;
+                currentPanel = { id: panelIdCounter, aiFinding: 'Unknown', defects: [] };
+                
+                const panel = elements.panel;
+                panel.style.transition = 'none';
+                panel.style.transform = 'translateX(0px)';
+                
+                elements.elStation.classList.remove('active');
+                elements.cameraStation.classList.remove('active');
+
+                runTimeout(() => {
+                    panel.style.transition = 'transform 1.5s ease-in-out';
+                    updateStatus(`Panel #${panelIdCounter} entering inspection line...`);
+                    panel.style.transform = `translateX(280px)`;
+                }, 100);
+
+                runTimeout(() => {
+                    updateStatus('Initiating Electroluminescence (EL) scan...');
+                    elements.elStation.classList.add('active');
+                }, 1600);
+
+                runTimeout(() => {
+                    updateStatus('Advancing to high-res imaging...');
+                    elements.elStation.classList.remove('active');
+                    panel.style.transform = `translateX(700px)`;
+                }, 2600);
+
+                 runTimeout(() => {
+                    updateStatus('Acquiring multi-spectrum image...');
+                    elements.cameraStation.classList.add('active');
+                    elements.flash.classList.add('camera-flash');
+                }, 4200);
+                
+                runTimeout(() => {
+                    elements.flash.classList.remove('camera-flash');
+                    elements.cameraStation.classList.remove('active');
+                    updateStatus('Image acquired. Transmitting to AI core...');
+                    elements.scannerBar.classList.remove('hidden');
+                }, 4500);
+                
+                runTimeout(() => {
+                    elements.scannerBar.classList.add('hidden');
+                    showAnalysisScreen();
+                }, 5500);
+            };
+
+            const animateWorkflow = () => {
+                elements.workflowSteps.forEach((step, index) => {
+                    runTimeout(() => step.classList.add('active'), index * 200);
+                });
+            };
+
+            const showAnalysisScreen = () => {
+                switchScreen('analysis');
+                elements.analysisPanelId.textContent = `#${currentPanel.id.toString().padStart(4, '0')}`;
+                
+                // Clear previous results
+                elements.elPanelImage.querySelectorAll('.defect-box, .visual-defect').forEach(el => el.remove());
+                elements.defectList.innerHTML = '';
+                elements.defectSummary.textContent = '';
+                elements.defectSummary.className = 'my-2 text-center p-4 rounded-lg font-bold text-xl flex-shrink-0';
+                elements.workflowSteps.forEach(s => s.classList.remove('active'));
+                
+                // Activate AI processing animation & workflow
+                elements.aiProcessingOverlay.classList.add('active');
+                animateWorkflow();
+
+                // Simulate AI Analysis Delay
+                runTimeout(() => {
+                    // First panel is defective, second is a pass
+                    const isDefective = panelIdCounter === 1; 
+                    
+                    if (isDefective) {
+                        currentPanel.aiFinding = 'Defect';
+                        currentPanel.defects = PRESET_DEFECTS;
+                    } else {
+                        currentPanel.aiFinding = 'Pass';
+                    }
+                    
+                    elements.aiProcessingOverlay.classList.remove('active');
+                    displayAnalysisResults();
+
+                }, 1200); // Faster analysis time
+            };
+            
+            const displayAnalysisResults = () => {
+                if (currentPanel.aiFinding === 'Defect') {
+                    elements.defectSummary.classList.add('bg-red-100', 'text-red-800');
+                    elements.defectSummary.textContent = `ALERT: ${currentPanel.defects.length} Defect(s) Identified`;
+
+                    currentPanel.defects.forEach((defect, index) => {
+                        // Draw visual defect ON the panel image
+                        if(defect.visual) {
+                            const vDefect = document.createElement('div');
+                            vDefect.className = `visual-defect ${defect.visual.class}`;
+                            vDefect.style.top = defect.visual.top;
+                            vDefect.style.left = defect.visual.left;
+                            vDefect.style.width = defect.visual.width;
+                            vDefect.style.height = defect.visual.height;
+                            vDefect.style.transform = defect.visual.transform;
+                            vDefect.style.animationDelay = `${index * 0.1}s`;
+                            elements.elPanelImage.appendChild(vDefect);
+                        }
+
+                        // Draw bounding box
+                        const box = document.createElement('div');
+                        box.className = 'defect-box';
+                        box.style.top = defect.top;
+                        box.style.left = defect.left;
+                        box.style.width = defect.width;
+                        box.style.height = defect.height;
+                        box.setAttribute('data-type', defect.type);
+                        box.setAttribute('data-severity', defect.severity);
+                        box.style.animationDelay = `${index * 0.15 + 0.1}s`; // Stagger after visual defect
+                        
+                        const styles = SEVERITY_STYLES[defect.severity] || { borderColor: '#FBBF24', bgColor: 'bg-amber-50' };
+                        box.style.borderColor = styles.borderColor;
+                        box.style.boxShadow = `0 0 15px ${styles.borderColor}`;
+                        
+                        elements.elPanelImage.appendChild(box);
+
+                        // Add to list
+                        const listItem = document.createElement('li');
+                        listItem.className = `p-3 rounded-md shadow-sm border-l-4 flex justify-between items-center ${styles.bgColor}`;
+                        listItem.style.borderColor = styles.borderColor;
+                        listItem.innerHTML = `<span class="font-semibold text-gray-700">${defect.type}</span> <span class="text-sm text-gray-500 font-medium bg-gray-200 px-2 py-1 rounded">${defect.severity}</span>`;
+                        elements.defectList.appendChild(listItem);
+                    });
+                } else {
+                    elements.defectSummary.classList.add('bg-green-100', 'text-green-800');
+                    elements.defectSummary.textContent = 'QUALITY ASSURED: No Defects Found';
+                    elements.defectList.innerHTML = `<li class="text-center text-gray-500 p-4">The AI model has certified this panel meets all quality standards.</li>`;
+                }
+
+                // After results are shown, decide next step
+                if(panelIdCounter === 1) {
+                    // Finished first panel, automatically start the second
+                    updateStatus('First panel analysis complete. Loading next panel...');
+                    runTimeout(runInspectionFlow, 4000); // Wait 4 seconds before next panel
+                } else if (panelIdCounter >= 2) {
+                    // Finished second panel, demo complete
+                    updateStatus('Demonstration complete. Ready for next cycle.');
+                }
+            };
+
+            buttons.start.addEventListener('click', () => {
+                isPaused = false;
+                panelIdCounter = 0; // Reset counter for a fresh run
+                runInspectionFlow();
+            });
+
+            buttons.restart.addEventListener('click', () => {
+                isPaused = false;
+                panelIdCounter = 0; // Reset counter for a fresh run
+                runInspectionFlow();
+            });
+
+            buttons.home.addEventListener('click', resetState);
+            
+            switchScreen('start');
+        });
+    </script>
+</body>
+</html>
+
+
+
