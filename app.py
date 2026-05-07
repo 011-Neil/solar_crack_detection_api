@@ -14,10 +14,10 @@ import os
 # Setup YOLOv5 custom model
 # ----------------------------
 model = torch.hub.load(
-    'ultralytics/yolov5',
+    './yolov5',
     'custom',
-    path='exp/weights/best.pt',
-    force_reload=True
+    path='best.pt',
+    source='local'
 )
 model.eval()
 
