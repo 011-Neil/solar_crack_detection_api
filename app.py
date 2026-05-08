@@ -2,9 +2,11 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, disconnect
+import os
+os.environ["MALLOC_ARENA_MAX"] = "1"
+
 import base64
 import time
-import os
 
 import subprocess
 import shutil
@@ -18,6 +20,9 @@ def get_model():
         return model
         
     import torch
+    
+    # Reduce thread count to prevent memory spikes on Render free tier
+    torch.set_num_threads(1)
         
     print("Initializing YOLOv5 model...")
     # Clone YOLOv5 locally if it doesn't exist or is an empty submodule
