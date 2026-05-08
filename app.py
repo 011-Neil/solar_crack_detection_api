@@ -2,9 +2,11 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, disconnect
+# pyrefly: ignore [missing-import]
 import torch
 from PIL import Image
 from io import BytesIO
+# pyrefly: ignore [missing-import]
 import cv2
 import base64
 import time
@@ -14,10 +16,10 @@ import os
 # Setup YOLOv5 custom model
 # ----------------------------
 model = torch.hub.load(
-    './yolov5',
+    'ultralytics/yolov5',
     'custom',
-    path='best.pt',
-    source='local'
+    path='exp/weights/best.pt',
+    force_reload=True
 )
 model.eval()
 
