@@ -10,6 +10,7 @@ import time
 
 import subprocess
 import shutil
+import torch
 
 # Global variable to hold the model
 model = None
@@ -27,7 +28,7 @@ def get_model():
         if model is not None:
             return model
 
-        import torch
+        
         
         # Reduce thread count to prevent memory spikes on Render free tier
         torch.set_num_threads(1)
@@ -74,8 +75,13 @@ CAMERA_SOURCES = {
 # Flask app + SocketIO
 # ----------------------------
 app = Flask(__name__)
-CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="eventlet"
+)
 
 @app.route('/')
 def index():
