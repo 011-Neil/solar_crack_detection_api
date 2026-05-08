@@ -13,10 +13,14 @@ import time
 import os
 
 import subprocess
+import shutil
 
-# Clone YOLOv5 locally if it doesn't exist to bypass GitHub API rate limits on Render
-if not os.path.exists('yolov5'):
-    print("Cloning YOLOv5 repository locally to bypass rate limits...")
+# Clone YOLOv5 locally if it doesn't exist or is an empty submodule
+if not os.path.exists(os.path.join('yolov5', 'hubconf.py')):
+    print("YOLOv5 missing or empty. Cloning repository locally to bypass rate limits...")
+    if os.path.exists('yolov5'):
+        # Remove the empty directory created by git submodule so clone succeeds
+        shutil.rmtree('yolov5')
     subprocess.run(["git", "clone", "https://github.com/ultralytics/yolov5.git"], check=True)
 
 try:
