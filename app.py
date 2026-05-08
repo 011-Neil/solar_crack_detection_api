@@ -15,26 +15,41 @@ import os
 import subprocess
 import shutil
 
-# Clone YOLOv5 locally if it doesn't exist or is an empty submodule
-if not os.path.exists(os.path.join('yolov5', 'hubconf.py')):
-    print("YOLOv5 missing or empty. Cloning repository locally to bypass rate limits...")
-    if os.path.exists('yolov5'):
-        # Remove the empty directory created by git submodule so clone succeeds
-        shutil.rmtree('yolov5')
-    subprocess.run(["git", "clone", "https://github.com/ultralytics/yolov5.git"], check=True)
+# Global variable to hold the model
+model = None
 
-try:
-    # Load from the local cloned 'yolov5' directory
-    model = torch.hub.load(
-        'yolov5',
-        'custom',
-        path='exp/weights/best.pt',
-        source='local'
-    )
-    model.eval()
-except Exception as e:
-    print(f"Error loading YOLOv5 model: {e}")
-    model = None
+def get_model():
+    global model
+    if model is not None:
+        return model
+        
+    print("Initializing YOLOv5 model...")
+    # Clone YOLOv5 locally if it doesn't exist or is an empty submodule
+    if not os.path.exists(os.path.join('yolov5', 'hubconf.py')):
+        print("YOLOv5 missing or empty. Cloning repository locally to bypass rate limits...")
+        if os.path.exists('yolov5'):
+            # Remove the empty directory created by git submodule so clone succeeds
+            shutil.rmtree('yolov5')
+        subprocess.run(["git", "clone", "https://github.com/ultralytics/yolov5.git"], check=True)
+
+    try:
+        # Load from the local cloned 'yolov5' directory
+        model = torch.hub.load(
+            'yolov5',
+            'custom',
+            path='exp/weights/best.pt',
+            source='local'
+        )
+        model.eval()
+    except Exception as e:
+        print(f"Error loading YOLOv5 model: {e}")
+        model = None
+        
+    if model is not None and torch.cuda.is_available():
+        model.to('cuda')
+        torch.backends.cudnn.benchmark = True  # speed up for fixed-size input
+        
+    return model
 
 CAMERA_SOURCES = {
     "pc": 0,        # default laptop/desktop webcam
@@ -42,10 +57,6 @@ CAMERA_SOURCES = {
     # or use RTSP/HTTP if DroidCam is streaming over WiFi:
     # "droid": "http://192.168.x.x:4747/video"
 }
-
-if torch.cuda.is_available():
-    model.to('cuda')
-    torch.backends.cudnn.benchmark = True  # speed up for fixed-size input
 
 # ----------------------------
 # Flask app + SocketIO
@@ -74,9 +85,13 @@ def detect_image():
         # Open image
         img = Image.open(BytesIO(img_bytes)).convert("RGB")
 
+        current_model = get_model()
+        if current_model is None:
+            return jsonify({"error": "Model failed to load"}), 500
+
         # Run YOLO inference
         with torch.no_grad():
-            results = model(img, size=640)
+            results = current_model(img, size=640)
 
         # Confidence threshold
         conf_threshold = 0.6
@@ -121,6 +136,10 @@ def detect_image():
 # ----------------------------
 @app.route('/api/detect-video', methods=['POST'])
 def detect_video():
+    current_model = get_model()
+    if current_model is None:
+        return jsonify({"error": "Model failed to load"}), 500
+
     file = request.files['file']
     input_path = 'temp_input.mp4'
     output_path = 'temp_output.mp4'
@@ -145,7 +164,7 @@ def detect_video():
         frame_count += 1
 
         with torch.no_grad():
-            results = model(frame, size=640 if not torch.cuda.is_available() else 640)
+            results = current_model(frame, size=640 if not torch.cuda.is_available() else 640)
 
         results.render()
         annotated_frame = results.ims[0] if hasattr(results, 'ims') else results.imgs[0]
@@ -197,6 +216,11 @@ def open_capture(camera_id):
 def stream_loop(sid, camera_id):
     global latest_crack_count
 
+    current_model = get_model()
+    if current_model is None:
+        print("Stream aborted: Model failed to load")
+        return
+
     cap = open_capture(camera_id)
     conf_threshold = 0.6
 
@@ -217,9 +241,9 @@ def stream_loop(sid, camera_id):
         # YOLO inference
         with torch.no_grad():
             if torch.cuda.is_available():
-                results = model(frame, size=infer_size)
+                results = current_model(frame, size=infer_size)
             else:
-                results = model(frame, size=infer_size)
+                results = current_model(frame, size=infer_size)
 
         # Count cracks >= threshold
         data = results.pandas().xyxy[0]
