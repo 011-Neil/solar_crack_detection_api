@@ -2,12 +2,6 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, disconnect
-# pyrefly: ignore [missing-import]
-import torch
-from PIL import Image
-from io import BytesIO
-# pyrefly: ignore [missing-import]
-import cv2
 import base64
 import time
 import os
@@ -22,6 +16,8 @@ def get_model():
     global model
     if model is not None:
         return model
+        
+    import torch
         
     print("Initializing YOLOv5 model...")
     # Clone YOLOv5 locally if it doesn't exist or is an empty submodule
@@ -89,6 +85,10 @@ def detect_image():
         file = request.files['image']
         img_bytes = file.read()
 
+        from PIL import Image
+        from io import BytesIO
+        import torch
+
         # Open image
         img = Image.open(BytesIO(img_bytes)).convert("RGB")
 
@@ -143,6 +143,8 @@ def detect_image():
 # ----------------------------
 @app.route('/api/detect-video', methods=['POST'])
 def detect_video():
+    import cv2
+    import torch
     current_model = get_model()
     if current_model is None:
         return jsonify({"error": "Model failed to load"}), 500
@@ -205,6 +207,7 @@ def detect_video():
 # WebSocket: ultra-smooth live stream
 # ----------------------------
 def open_capture(camera_id):
+    import cv2
     """
     camera_id can be:
     - int index (0,1,2,...) for PC webcam / DroidCam (USB virtual cam)
@@ -221,6 +224,8 @@ def open_capture(camera_id):
     return cv2.VideoCapture(cam_index)
 
 def stream_loop(sid, camera_id):
+    import cv2
+    import torch
     global latest_crack_count
 
     current_model = get_model()
@@ -345,4 +350,5 @@ def get_live_crack_count():
 if __name__ == "__main__":
     # Use eventlet or gevent for best SocketIO performance
     # pip install eventlet
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host="0.0.0.0", port=port, debug=True)
