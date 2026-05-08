@@ -15,13 +15,18 @@ import os
 # ----------------------------
 # Setup YOLOv5 custom model
 # ----------------------------
-model = torch.hub.load(
-    'ultralytics/yolov5',
-    'custom',
-    path='exp/weights/best.pt',
-    force_reload=True
-)
-model.eval()
+try:
+    model = torch.hub.load(
+        'ultralytics/yolov5',
+        'custom',
+        path='exp/weights/best.pt',
+        force_reload=True,
+        trust_repo=True  # Required for PyTorch >= 2.0 to avoid interactive prompt
+    )
+    model.eval()
+except Exception as e:
+    print(f"Error loading YOLOv5 model: {e}")
+    model = None
 
 CAMERA_SOURCES = {
     "pc": 0,        # default laptop/desktop webcam
