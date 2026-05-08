@@ -12,16 +12,20 @@ import base64
 import time
 import os
 
-# ----------------------------
-# Setup YOLOv5 custom model
-# ----------------------------
+import subprocess
+
+# Clone YOLOv5 locally if it doesn't exist to bypass GitHub API rate limits on Render
+if not os.path.exists('yolov5'):
+    print("Cloning YOLOv5 repository locally to bypass rate limits...")
+    subprocess.run(["git", "clone", "https://github.com/ultralytics/yolov5.git"], check=True)
+
 try:
+    # Load from the local cloned 'yolov5' directory
     model = torch.hub.load(
-        'ultralytics/yolov5',
+        'yolov5',
         'custom',
         path='exp/weights/best.pt',
-        force_reload=True,
-        trust_repo=True  # Required for PyTorch >= 2.0 to avoid interactive prompt
+        source='local'
     )
     model.eval()
 except Exception as e:
