@@ -65,6 +65,13 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+@app.route('/')
+def index():
+    return jsonify({
+        "status": "online", 
+        "message": "Solar Crack Detection API is running!"
+    })
+
 latest_crack_count = 0
 STREAMS = {}  # sid -> { "running": bool, "camera_id": any }
 
