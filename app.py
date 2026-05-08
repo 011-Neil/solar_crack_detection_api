@@ -14,43 +14,54 @@ import shutil
 # Global variable to hold the model
 model = None
 
+import threading
+model_lock = threading.Lock()
+
 def get_model():
     global model
     if model is not None:
         return model
         
-    import torch
-    
-    # Reduce thread count to prevent memory spikes on Render free tier
-    torch.set_num_threads(1)
-        
-    print("Initializing YOLOv5 model...")
-    # Clone YOLOv5 locally if it doesn't exist or is an empty submodule
-    if not os.path.exists(os.path.join('yolov5', 'hubconf.py')):
-        print("YOLOv5 missing or empty. Cloning repository locally to bypass rate limits...")
-        if os.path.exists('yolov5'):
-            # Remove the empty directory created by git submodule so clone succeeds
-            shutil.rmtree('yolov5')
-        subprocess.run(["git", "clone", "https://github.com/ultralytics/yolov5.git"], check=True)
+    with model_lock:
+        # Check again inside lock
+        if model is not None:
+            return model
 
-    try:
-        # Load from the local cloned 'yolov5' directory
-        model = torch.hub.load(
-            'yolov5',
-            'custom',
-            path='exp/weights/best.pt',
-            source='local'
-        )
-        model.eval()
-    except Exception as e:
-        print(f"Error loading YOLOv5 model: {e}")
-        model = None
+        import torch
         
-    if model is not None and torch.cuda.is_available():
-        model.to('cuda')
-        torch.backends.cudnn.benchmark = True  # speed up for fixed-size input
-        
-    return model
+        # Reduce thread count to prevent memory spikes on Render free tier
+        torch.set_num_threads(1)
+            
+        print("Initializing YOLOv5 model...")
+        # Clone YOLOv5 locally if it doesn't exist or is an empty submodule
+        if not os.path.exists(os.path.join('yolov5', 'hubconf.py')):
+            print("YOLOv5 missing or empty. Cloning repository locally to bypass rate limits...")
+            if os.path.exists('yolov5'):
+                # Remove the empty directory created by git submodule so clone succeeds
+                import shutil
+                shutil.rmtree('yolov5')
+            
+            import subprocess
+            subprocess.run(["git", "clone", "https://github.com/ultralytics/yolov5.git"], check=True)
+
+        try:
+            # Load from the local cloned 'yolov5' directory
+            model = torch.hub.load(
+                'yolov5',
+                'custom',
+                path='exp/weights/best.pt',
+                source='local'
+            )
+            model.eval()
+        except Exception as e:
+            print(f"Error loading YOLOv5 model: {e}")
+            model = None
+            
+        if model is not None and torch.cuda.is_available():
+            model.to('cuda')
+            torch.backends.cudnn.benchmark = True  # speed up for fixed-size input
+            
+        return model
 
 CAMERA_SOURCES = {
     "pc": 0,        # default laptop/desktop webcam
